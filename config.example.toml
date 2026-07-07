@@ -1,0 +1,56 @@
+# paperless-dashboard configuration
+#
+# Precedence (highest wins): command-line flag > environment variable >
+# this file > built-in default. A warning is printed at startup when a
+# higher-precedence source overrides one of these values.
+
+[paperless]
+url = "https://paperless.example.com"
+# Create a token in Paperless under Settings → Users & Groups → API token,
+# or set it via the PAPERLESS_TOKEN environment variable instead.
+token = "your-api-token-here"
+
+[server]
+listen = "127.0.0.1:8985"   # or PAPERLESS_DASHBOARD_LISTEN / --listen
+refresh_minutes = 15        # how often to re-query Paperless in the background
+
+# ── Checks ──────────────────────────────────────────────────────────────
+# Each [[check]] watches one recurring document. Fields:
+#   name           display name on the dashboard (required)
+#   correspondent  Paperless correspondent name (case-insensitive)
+#   document_type  Paperless document type name
+#   tags           list of tag names the document must have (all of them)
+#   frequency      "monthly" (default), "quarterly", or "yearly"
+#   lookback       how many periods to check (default: 12 monthly, 4 quarterly, 3 yearly)
+#   grace_days     days into the current period before it counts as missing
+#                  (default: the full period, i.e. a period is only "missing"
+#                  once it has fully passed)
+#   expected_month yearly only: month (1-12) the document normally arrives;
+#                  the current year stays "pending" until that month (plus
+#                  grace_days) has passed
+#   custom_fields  custom field names to show from the newest document
+
+[[check]]
+name = "Eversource Bill"
+correspondent = "Eversource"
+document_type = "Bill"
+frequency = "monthly"
+lookback = 12
+custom_fields = ["amount"]
+
+[[check]]
+name = "T-Mobile Bill"
+correspondent = "T-Mobile"
+document_type = "Bill"
+frequency = "monthly"
+lookback = 12
+custom_fields = ["amount"]
+
+[[check]]
+name = "Tax Receipts"
+document_type = "Tax"
+tags = ["taxes"]
+frequency = "yearly"
+lookback = 3
+expected_month = 7
+grace_days = 14

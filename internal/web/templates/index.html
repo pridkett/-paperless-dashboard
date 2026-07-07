@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paperless Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>📄 Paperless Dashboard</h1>
+      <div class="header-meta">
+        <span class="pill pill-ok">{{.Healthy}} healthy</span>
+        {{if .Attention}}<span class="pill pill-bad">{{.Attention}} need attention</span>{{end}}
+        <form method="post" action="/refresh"><button type="submit">↻ Refresh</button></form>
+      </div>
+    </div>
+    <p class="subtitle">
+      Watching <a href="{{.PaperlessURL}}">{{.PaperlessURL}}</a>
+      {{if not .Updated.IsZero}} · updated {{date .Updated}} {{.Updated.Format "3:04 PM"}}{{end}}
+    </p>
+  </header>
+
+  <main>
+    {{if not .Results}}
+    <div class="empty">
+      <p>No checks configured yet.</p>
+      <p>Add <code>[[check]]</code> blocks to your <code>config.toml</code> to start tracking documents.</p>
+    </div>
+    {{end}}
+
+    <div class="grid">
+      {{range .Results}}
+      <section class="card {{if .Err}}card-error{{else if .Healthy}}card-ok{{else}}card-bad{{end}}">
+        <div class="card-head">
+          <h2>{{.Check.Name}}</h2>
+          {{if .Err}}
+            <span class="badge badge-error">error</span>
+          {{else if .Healthy}}
+            <span class="badge badge-ok">up to date</span>
+          {{else}}
+            <span class="badge badge-bad">{{.Missing}} missing</span>
+          {{end}}
+        </div>
+
+        <p class="card-filter">
+          {{with .Check.Correspondent}}<span>{{.}}</span>{{end}}
+          {{with .Check.DocumentType}}<span>{{.}}</span>{{end}}
+          {{range .Check.Tags}}<span class="tag">#{{.}}</span>{{end}}
+          <span class="freq">{{.Check.Frequency}}</span>
+        </p>
+
+        {{if .Err}}
+        <p class="error-text">{{.Err}}</p>
+        {{else}}
+        <div class="periods">
+          {{range .Periods}}
+          {{if .DocID}}
+          <a class="period period-{{.Status}}" href="{{docURL .DocID}}" target="_blank" rel="noopener"
+             title="{{.Doc}} — open in Paperless{{if gt .Count 1}} ({{.Count}} documents this period){{end}}">
+            <span class="dot"></span>
+            <span class="period-label">{{.Label}}</span>
+          </a>
+          {{else}}
+          <div class="period period-{{.Status}}" title="{{.Label}}: {{.Status}}">
+            <span class="dot"></span>
+            <span class="period-label">{{.Label}}</span>
+          </div>
+          {{end}}
+          {{end}}
+        </div>
+
+        {{if .LatestDoc}}
+        <p class="latest">Latest:
+          <a href="{{docURL .LatestID}}" target="_blank" rel="noopener"><strong>{{.LatestDoc}}</strong></a>{{if not .LatestDate.IsZero}} · {{date .LatestDate}}{{end}}</p>
+        {{end}}
+
+        {{if .CustomValues}}
+        <p class="fields">
+          {{range .CustomValues}}<span class="field"><span class="field-name">{{.Name}}</span> {{.Value}}</span>{{end}}
+        </p>
+        {{end}}
+        {{end}}
+      </section>
+      {{end}}
+    </div>
+  </main>
+
+  <footer>
+    <p>paperless-dashboard · auto-refreshes in the background</p>
+  </footer>
+</body>
+</html>
