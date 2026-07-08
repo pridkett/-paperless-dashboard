@@ -98,6 +98,44 @@ func TestClassifyYearlyExpectedMonth(t *testing.T) {
 	}
 }
 
+func TestFirstOfMonthUTCStaysInItsMonth(t *testing.T) {
+	e := &Engine{}
+	ck := config.Check{Frequency: "monthly", Lookback: 3}
+	periods := buildPeriods(ck, now) // May, Jun, Jul 2026
+
+	// A statement dated June 1 that Paperless serializes as UTC midnight.
+	// In any timezone west of UTC this instant is still May 31 locally,
+	// but it must be bucketed by its calendar date: June.
+	docs := []paperless.Document{
+		{ID: 7, Title: "Freedom Mortgage Jun 2026", Created: "2026-06-01T00:00:00Z"},
+	}
+	e.classify(ck, periods, docs, now)
+
+	if periods[0].Status != StatusMissing {
+		t.Errorf("May = %s, want missing (doc belongs to June)", periods[0].Status)
+	}
+	if periods[1].Status != StatusOK || periods[1].DocID != 7 {
+		t.Errorf("Jun = %s (doc %d), want ok with doc 7", periods[1].Status, periods[1].DocID)
+	}
+}
+
+func TestCreatedDateFieldPreferred(t *testing.T) {
+	e := &Engine{}
+	ck := config.Check{Frequency: "monthly", Lookback: 2}
+	periods := buildPeriods(ck, now) // Jun, Jul 2026
+
+	// created_date (the date shown in the Paperless UI) wins over the
+	// created instant when both are present.
+	docs := []paperless.Document{
+		{ID: 8, Created: "2026-05-31T22:00:00Z", CreatedDate: "2026-06-01"},
+	}
+	e.classify(ck, periods, docs, now)
+
+	if periods[0].Status != StatusOK {
+		t.Errorf("Jun = %s, want ok via created_date", periods[0].Status)
+	}
+}
+
 func TestPeriodLinksToNewestDocument(t *testing.T) {
 	e := &Engine{}
 	ck := config.Check{Frequency: "monthly", Lookback: 2}

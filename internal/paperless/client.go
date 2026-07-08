@@ -42,7 +42,8 @@ func New(baseURL, token string) *Client {
 type Document struct {
 	ID           int               `json:"id"`
 	Title        string            `json:"title"`
-	Created      string            `json:"created"` // RFC 3339 or YYYY-MM-DD depending on version
+	Created      string            `json:"created"`      // RFC 3339 or YYYY-MM-DD depending on version
+	CreatedDate  string            `json:"created_date"` // plain YYYY-MM-DD, matches the Paperless UI
 	Tags         []int             `json:"tags"`
 	CustomFields []CustomFieldItem `json:"custom_fields"`
 }
@@ -53,12 +54,22 @@ type CustomFieldItem struct {
 	Value json.RawMessage `json:"value"`
 }
 
-// CreatedTime parses the document's created timestamp.
+// CreatedTime returns the document's created date as local midnight, so that
+// period bucketing agrees with the calendar date shown in the Paperless UI.
+// A UTC instant like 2026-06-01T00:00:00Z must land in June, not (in western
+// timezones) drift back to May 31 — so the calendar date is taken from the
+// timestamp's own zone and only then anchored in local time.
 func (d Document) CreatedTime() (time.Time, error) {
-	if t, err := time.Parse(time.RFC3339, d.Created); err == nil {
-		return t, nil
+	if d.CreatedDate != "" {
+		if t, err := time.ParseInLocation("2006-01-02", d.CreatedDate, time.Local); err == nil {
+			return t, nil
+		}
 	}
-	return time.Parse("2006-01-02", d.Created)
+	if t, err := time.Parse(time.RFC3339, d.Created); err == nil {
+		y, m, day := t.Date()
+		return time.Date(y, m, day, 0, 0, 0, 0, time.Local), nil
+	}
+	return time.ParseInLocation("2006-01-02", d.Created, time.Local)
 }
 
 type listPage[T any] struct {
