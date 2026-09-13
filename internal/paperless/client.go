@@ -27,7 +27,7 @@ type Client struct {
 	correspondents map[string]int // lowercase name -> id
 	documentTypes  map[string]int
 	tags           map[string]int
-	customFields   map[string]int
+	customFields   map[string]CustomField // lowercase name -> definition
 }
 
 func New(baseURL, token string) *Client {
@@ -47,6 +47,22 @@ type Document struct {
 	Tags         []int             `json:"tags"`
 	CustomFields []CustomFieldItem `json:"custom_fields"`
 }
+
+// CustomField is a custom field definition. The data type and default
+// currency matter because Paperless stores a monetary value bare, as
+// "174.87", whenever the document inherits the field's default currency, and
+// only writes the ISO code into the value when a document overrides it.
+type CustomField struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	DataType  string `json:"data_type"`
+	ExtraData struct {
+		DefaultCurrency string `json:"default_currency"`
+	} `json:"extra_data"`
+}
+
+// Monetary reports whether the field holds a currency amount.
+func (f CustomField) Monetary() bool { return f.DataType == "monetary" }
 
 // CustomFieldItem is a custom field value attached to a document.
 type CustomFieldItem struct {
@@ -151,9 +167,32 @@ func (c *Client) TagID(ctx context.Context, name string) (int, error) {
 	return c.lookup(ctx, "/api/tags/", "tag", &c.tags, name)
 }
 
-// CustomFieldID resolves a custom field name to its ID.
-func (c *Client) CustomFieldID(ctx context.Context, name string) (int, error) {
-	return c.lookup(ctx, "/api/custom_fields/", "custom field", &c.customFields, name)
+// CustomField resolves a custom field name to its full definition.
+func (c *Client) CustomField(ctx context.Context, name string) (CustomField, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.customFields == nil {
+		table := make(map[string]CustomField)
+		next := "/api/custom_fields/?page_size=250"
+		for next != "" {
+			var page listPage[CustomField]
+			if err := c.getJSON(ctx, next, &page); err != nil {
+				return CustomField{}, err
+			}
+			for _, f := range page.Results {
+				table[strings.ToLower(f.Name)] = f
+			}
+			next = c.relativize(page.Next)
+		}
+		c.customFields = table
+	}
+
+	f, ok := c.customFields[strings.ToLower(name)]
+	if !ok {
+		return CustomField{}, fmt.Errorf("no custom field named %q in Paperless", name)
+	}
+	return f, nil
 }
 
 // lookup fetches and caches the full name->ID table for one object kind,

@@ -200,6 +200,7 @@ a.period:hover .period-label { color: var(--accent); }
   padding: 0.2rem 0.6rem;
 }
 .field-name { color: var(--muted); margin-right: 0.3rem; }
+.field-value { font-variant-numeric: tabular-nums; }
 
 .error-text { color: var(--pending); font-size: 0.9rem; }
 

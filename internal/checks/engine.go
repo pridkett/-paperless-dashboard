@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/pridkett/paperless-dashboard/internal/config"
+	"github.com/pridkett/paperless-dashboard/internal/currency"
 	"github.com/pridkett/paperless-dashboard/internal/paperless"
 )
 
@@ -256,18 +257,36 @@ func (e *Engine) latestInfo(ctx context.Context, res *Result, docs []paperless.D
 	}
 
 	for _, name := range res.Check.CustomFields {
-		id, err := e.Client.CustomFieldID(ctx, name)
+		field, err := e.Client.CustomField(ctx, name)
 		if err != nil {
 			res.CustomValues = append(res.CustomValues, FieldValue{Name: name, Value: "unknown field"})
 			continue
 		}
 		for _, cf := range newest.CustomFields {
-			if cf.Field == id {
-				res.CustomValues = append(res.CustomValues, FieldValue{Name: name, Value: rawToString(cf.Value)})
+			if cf.Field == field.ID {
+				res.CustomValues = append(res.CustomValues, FieldValue{
+					Name:  name,
+					Value: formatFieldValue(field, rawToString(cf.Value)),
+				})
 				break
 			}
 		}
 	}
+}
+
+// formatFieldValue renders one custom field value for display. Monetary
+// fields get a currency symbol and grouped digits; a value that already
+// names its currency keeps that one, and a bare value inherits the currency
+// the field itself defaults to, which is what the Paperless UI shows.
+func formatFieldValue(f paperless.CustomField, raw string) string {
+	if !f.Monetary() {
+		return raw
+	}
+	code, amount := currency.Split(raw)
+	if code == "" {
+		code = f.ExtraData.DefaultCurrency
+	}
+	return currency.Format(code, amount)
 }
 
 func rawToString(raw json.RawMessage) string {
